@@ -26,14 +26,30 @@ the real project scopes in negotiating per-vehicle agents.
 
 ## LLM integration (Gemini) — optional, with a required fallback
 
-`dispatch_agent.py` calls Gemini once per pending order to pick a vehicle
-among the idle, sufficiently-charged candidates. It returns `None` — not
-an exception — whenever `GEMINI_API_KEY` is missing/placeholder, the
-`google-genai` package isn't installed, the call fails, or the response
-can't be parsed into a valid vehicle id. `dispatch()` treats `None` as
-"use the rule-based policy" (nearest candidate to the delivery point).
-Every LLM pick is drawn only from the pre-filtered candidate list, so a
-bad response can never assign a broken or unreachable vehicle.
+`dispatch_agent.py` calls Gemini **once per tick** (`_llm_batch_pick()`),
+asking it to assign every currently-pending order to a vehicle in one
+request — not once per order, which would exhaust a free-tier quota in
+seconds. It returns `{}` — not an exception — whenever `GEMINI_API_KEY` is
+missing/placeholder, the `google-genai` package isn't installed, the call
+fails, or the response can't be parsed into valid `{order_id: vehicle_id}`
+pairs. `dispatch()` treats a missing order→vehicle mapping as "use the
+rule-based policy" for that order (nearest candidate to the delivery
+point). Every LLM assignment is checked against the live candidate list
+before being accepted, and a vehicle the model tries to assign twice is
+only honored the first time — so a bad or greedy response can never
+double-book or assign a broken/unreachable vehicle.
+
+Two things below show this actually happening end to end with a live key:
+which orders got picked by the model vs. the rule, and what happens when
+the model call itself fails mid-run.
+
+**Quota cooldown.** Once a call fails with a quota/rate-limit error
+(`429 RESOURCE_EXHAUSTED`), further LLM calls are skipped for 60 seconds
+and every order falls straight to the rule-based policy instead of
+retrying (and failing the same way) on every subsequent tick. Measured
+effect on `evaluate.py`'s 5-seed run: 149 API calls without the cooldown,
+3 with it — the same eventual outcome (quota exhausted → fallback for the
+rest of the run), reached without hammering the API.
 
 `charge_scheduler.py` is deliberately rule-based only (lowest-battery
 vehicle to the next free charger) — no LLM. The real project's "improve"
@@ -42,27 +58,46 @@ time-of-use rate; this baseline just proves the on-time/km/cost eval loop
 works before that negotiation layer exists.
 
 **The LLM path is deliberately weak, not just optional.** When a real key
-*is* configured, `_llm_pick()` is worse than the rule-based fallback on
-purpose, so a naive single-call LLM baseline doesn't accidentally look like
-a solution:
+*is* configured, `_llm_batch_pick()` is worse than the rule-based fallback
+on purpose, so a naive LLM baseline doesn't accidentally look like a
+solution:
 - it sees every idle vehicle regardless of battery (`_llm_candidate_pool()`)
   instead of the feasibility-filtered set the rule-based path restricts
   itself to (`_candidates()`), so it can send a van that can't make the
   round trip;
 - the prompt withholds precomputed distance/battery numbers, so the model
   has to estimate them from raw coordinates instead of being handed the
-  answer;
-- it's called once per pending order per tick with no memoization or
-  batching, so an order that failed to parse last tick pays for an
-  identical fresh API call again next tick.
+  answer.
 
 This is intentional: the point of a baseline is to leave headroom, and a
-too-competent one-shot LLM call would undersell why the real project's
-negotiating, feasibility-checked agents are needed at all.
+too-competent LLM call would undersell why the real project's negotiating,
+feasibility-checked agents are needed at all.
 
 **This is the one required property: the system works with or without the
 LLM.** Both `dispatch_agent.py` and `charge_scheduler.py` are runnable
 standalone as no-network self-checks of the fallback path.
+
+### Live run: LLM picks, a mid-run model failure, and the fallback catching both
+
+```bash
+cd fleet_dispatch_baseline
+python3 demo.py   # with a real GEMINI_API_KEY set in .env
+```
+
+![demo.py terminal output with a live Gemini key: some orders picked by llm, one hitting a 503 and falling back to rule](demo_output_llm.png)
+
+Reading this run: order 0 is dispatched by the LLM (`picked by llm`).
+Order 2's dispatch attempt hits a live `503 UNAVAILABLE` from Gemini
+("model is currently experiencing high demand") — that failure is logged
+plainly (`llm batch dispatch unavailable: ...`) rather than silently
+swallowed, and the order is immediately handed to the rule-based policy
+in the same tick (`picked by rule`) so nothing stalls. The same pattern
+repeats at t=5 and t=10, and the LLM succeeds again for order 9 at t=13.
+The vehicle breakdown at t=6 and order 2's eventual late delivery at t=17
+are unaffected by which policy did the picking — both paths write to the
+same event log and the same vehicle/order state, so the rest of the
+simulation can't tell the difference between an LLM pick and a rule pick
+except for the label in the log.
 
 ## What's here
 

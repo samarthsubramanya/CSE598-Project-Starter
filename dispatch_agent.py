@@ -5,8 +5,8 @@ Same pattern as degree_plan_baseline/llm_agent.py: the LLM call returns
 None whenever a key isn't configured, the SDK is missing, or the response
 can't be parsed — falling back to the rule-based nearest-vehicle pick.
 
-Deliberately weak/inefficient by design, not by accident — this is the
-baseline the real project needs to beat, not a preview of it:
+Deliberately weak by design, not by accident — this is the baseline the
+real project needs to beat, not a preview of it:
 - The LLM sees every idle vehicle, not just the battery-feasible ones the
   rule-based path restricts itself to (`_candidates` vs.
   `_llm_candidate_pool`) — so it can send an underpowered van the rule-based
@@ -14,13 +14,19 @@ baseline the real project needs to beat, not a preview of it:
 - The prompt withholds precomputed distance/battery numbers, so the model
   has to estimate them from raw positions instead of being handed the
   answer — a plain "closest vehicle" heuristic would just compute this.
-- It's called once per pending order per tick with no memoization or
-  batching — an order that failed to parse last tick pays for a fresh API
-  call again next tick, identical prompt, no caching.
+
+Calls are batched one-per-tick (all pending orders assigned in a single
+request), not one-per-order. In practice this barely reduces call count on
+its own — with more vehicles than the order-arrival rate, there's rarely
+more than one pending order per tick anyway. The change that actually
+matters once a quota is exhausted is the cooldown below: after a
+quota/rate-limit error, stop calling the API for a while instead of
+retrying (and failing) on every subsequent tick.
 """
 import json
 import os
 import re
+import time
 
 try:
     from dotenv import load_dotenv
@@ -30,7 +36,7 @@ except ImportError:
 
 from sim import distance, DEPOT
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-3.8-flash"
 
 
 def _api_key():
@@ -58,31 +64,54 @@ def _rule_based_pick(order, candidates):
     return min(candidates, key=lambda v: distance(v.pos, order.dest))
 
 
-def _llm_pick(order, candidates):
-    """Returns (chosen_vehicle_or_None, failure_reason_or_None). The reason
-    is surfaced by dispatch() into the event log — a silently-swallowed
-    exception is exactly what made a rate-limited/misconfigured key look
-    identical to "no key configured" when testing manually."""
+_cooldown_until = 0.0
+_COOLDOWN_SECONDS = 60
+
+
+def _quota_exhausted(exc_text):
+    return "RESOURCE_EXHAUSTED" in exc_text or "429" in exc_text
+
+
+def _llm_batch_pick(orders, candidates):
+    """One call handles every pending order at once, instead of one call
+    per order. Returns ({order_id: vehicle}, failure_reason_or_None); a
+    reason is surfaced by dispatch() into the event log rather than
+    silently swallowed, so a rate limit doesn't just look identical to "no
+    key configured" when testing manually.
+
+    Once a call fails with a quota/rate-limit error, further calls are
+    skipped for _COOLDOWN_SECONDS — without this, a single exhausted quota
+    means every remaining tick still pays for a doomed API round-trip that
+    was always going to fail the same way."""
+    global _cooldown_until
     key = _api_key()
-    if not key or not candidates:
-        return None, None
+    if not key or not orders or not candidates:
+        return {}, None
+    remaining = _cooldown_until - time.monotonic()
+    if remaining > 0:
+        return {}, f"skipping call, quota cooldown active for {remaining:.0f}s more"
     try:
         from google import genai
+        from google.genai import types
     except ImportError:
-        return None, "google-genai package not installed"
+        return {}, "google-genai package not installed"
 
     # Deliberately withholds the distance/battery numbers the rule-based
     # policy uses directly — the model has to estimate them from raw
     # coordinates, which a plain nearest-vehicle heuristic never needs to do.
-    lines = "\n".join(f"- vehicle {v.id}: position {v.pos}" for v in candidates)
-    prompt = f"""A delivery order needs to go to {order.dest}.
-Pick a vehicle to send.
-Candidates:
-{lines}
+    order_lines = "\n".join(f"- order {o.id}: destination {o.dest}" for o in orders)
+    vehicle_lines = "\n".join(f"- vehicle {v.id}: position {v.pos}" for v in candidates)
+    prompt = f"""Assign vehicles to delivery orders.
+Orders:
+{order_lines}
 
-Respond with ONLY the chosen vehicle id as an integer, nothing else."""
+Available vehicles:
+{vehicle_lines}
+
+Respond with ONLY a JSON object mapping order id to vehicle id, e.g.
+{{"0": 2, "1": 0}}. Only use vehicle ids listed above, each at most once.
+Not every order needs an assignment."""
     try:
-        from google.genai import types
         # Without an explicit timeout/retry cap, a blocked or slow network
         # path (e.g. a sandboxed dev environment with no outbound access)
         # makes this call hang or retry for minutes instead of falling back
@@ -94,31 +123,46 @@ Respond with ONLY the chosen vehicle id as an integer, nothing else."""
         client = genai.Client(api_key=key, http_options=http_options)
         response = client.models.generate_content(model=MODEL, contents=prompt)
         text = (response.text or "").strip()
-        match = re.search(r"\d+", text)
+        match = re.search(r"\{.*\}", text, re.DOTALL)
         if not match:
-            return None, f"unparseable response: {text[:80]!r}"
-        vid = int(match.group(0))
-        picked = next((v for v in candidates if v.id == vid), None)
-        if picked is None:
-            return None, f"model picked invalid/ineligible vehicle id {vid}"
-        return picked, None
+            return {}, f"unparseable response: {text[:80]!r}"
+        raw = json.loads(match.group(0))
+        by_id = {v.id: v for v in candidates}
+        assignments, used_vehicles = {}, set()
+        for order_id_str, vehicle_id in raw.items():
+            try:
+                order_id, vehicle_id = int(order_id_str), int(vehicle_id)
+            except (TypeError, ValueError):
+                continue
+            vehicle = by_id.get(vehicle_id)
+            if vehicle is None or vehicle_id in used_vehicles:
+                continue  # invalid id, or the model double-booked a vehicle
+            assignments[order_id] = vehicle
+            used_vehicles.add(vehicle_id)
+        return assignments, None
     except Exception as e:
-        return None, f"{type(e).__name__}: {str(e)[:150]}"
+        msg = str(e)
+        if _quota_exhausted(msg):
+            _cooldown_until = time.monotonic() + _COOLDOWN_SECONDS
+        return {}, f"{type(e).__name__}: {msg[:150]}"
 
 
 def dispatch(sim):
     """Assign every unassigned, undelivered order to a vehicle if one is
     available. Mutates sim in place — called once per tick."""
     pending = [o for o in sim.orders.values() if o.assigned_to is None and o.delivered_tick is None]
+    if not pending:
+        return
+    llm_assignments, llm_reason = _llm_batch_pick(pending, _llm_candidate_pool(sim))
+    if llm_reason:
+        sim.event(f"  llm batch dispatch unavailable: {llm_reason}")
     for order in pending:
-        llm_choice, llm_reason = _llm_pick(order, _llm_candidate_pool(sim))
         candidates = _candidates(sim)
-        if llm_choice:
-            chosen, source = llm_choice, "llm"
+        llm_vehicle = llm_assignments.get(order.id)
+        if llm_vehicle is not None and llm_vehicle.status == "idle":
+            chosen, source = llm_vehicle, "llm"
         elif candidates:
             chosen, source = _rule_based_pick(order, candidates), "rule"
-            if llm_reason:
-                sim.event(f"  llm unavailable for order {order.id}: {llm_reason}")
         else:
             break
         chosen.status = "enroute"
@@ -158,6 +202,6 @@ if __name__ == "__main__":
     print("self-check passed: LLM pool is deliberately wider (includes low-battery) than the rule-based candidate set.")
 
     if _api_key() is None:
-        picked, reason = _llm_pick(order, cands)
-        assert picked is None and reason is None, "expected (None, None) with no configured API key"
-        print("self-check passed: no API key configured, _llm_pick() correctly fell back to (None, None).")
+        assignments, reason = _llm_batch_pick([order], cands)
+        assert assignments == {} and reason is None, "expected ({}, None) with no configured API key"
+        print("self-check passed: no API key configured, _llm_batch_pick() correctly fell back to ({}, None).")
