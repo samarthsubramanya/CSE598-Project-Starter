@@ -1,0 +1,183 @@
+=== Trace run (seed=3, 6 vehicles, 120 ticks) ===
+
+-- Event log --
+t=  0  order  0 created  -> dest (4, 10), deadline t=32
+t=  0  order  0 dispatched -> vehicle 0 (dist 14, battery 100%, picked by rule)
+t=  4  order  1 created  -> dest (3, 9), deadline t=32
+t=  4  order  1 dispatched -> vehicle 1 (dist 12, battery 100%, picked by rule)
+t=  8  order  2 created  -> dest (3, 8), deadline t=32
+t=  8  order  2 dispatched -> vehicle 2 (dist 11, battery 100%, picked by rule)
+t= 11  order  0 delivered by vehicle 0 at (4, 10) -- ON TIME (deadline t=32)
+t= 12  order  3 created  -> dest (10, 5), deadline t=41
+t= 12  order  3 dispatched -> vehicle 3 (dist 15, battery 100%, picked by rule)
+t= 14  order  1 delivered by vehicle 1 at (3, 9) -- ON TIME (deadline t=32)
+t= 15  INCIDENT: charger 2 offline until t=18
+t= 16  order  4 created  -> dest (10, 9), deadline t=45
+t= 16  order  4 dispatched -> vehicle 4 (dist 19, battery 100%, picked by rule)
+t= 17  order  2 delivered by vehicle 2 at (3, 8) -- ON TIME (deadline t=32)
+t= 20  order  5 created  -> dest (9, 5), deadline t=50
+t= 20  order  5 dispatched -> vehicle 5 (dist 14, battery 100%, picked by rule)
+t= 23  order  3 delivered by vehicle 3 at (10, 5) -- ON TIME (deadline t=41)
+t= 24  order  6 created  -> dest (1, 6), deadline t=45
+t= 24  order  6 dispatched -> vehicle 0 (dist 7, battery 60%, picked by rule)
+t= 27  order  4 delivered by vehicle 4 at (10, 9) -- ON TIME (deadline t=45)
+t= 28  order  7 created  -> dest (6, 4), deadline t=55
+t= 28  order  7 dispatched -> vehicle 1 (dist 10, battery 64%, picked by rule)
+t= 30  order  5 delivered by vehicle 5 at (9, 5) -- ON TIME (deadline t=50)
+t= 31  order  6 delivered by vehicle 0 at (1, 6) -- ON TIME (deadline t=45)
+t= 32  order  8 created  -> dest (9, 5), deadline t=63
+t= 32  order  8 dispatched -> vehicle 2 (dist 14, battery 68%, picked by rule)
+t= 33  INCIDENT: charger 0 offline until t=40
+t= 35  order  7 delivered by vehicle 1 at (6, 4) -- ON TIME (deadline t=55)
+t= 36  order  9 created  -> dest (5, 9), deadline t=65
+t= 36  order  9 dispatched -> vehicle 3 (dist 14, battery 60%, picked by rule)
+t= 38  vehicle 0 (battery 36%) assigned to charger 1 at 0.40$/%
+t= 40  order 10 created  -> dest (2, 3), deadline t=63
+t= 40  order 10 dispatched -> vehicle 4 (dist 5, battery 60%, picked by rule)
+t= 42  order  8 delivered by vehicle 2 at (9, 5) -- ON TIME (deadline t=63)
+t= 42  vehicle 0 finished charging on charger 1 (battery 100%)
+t= 42  vehicle 1 (battery 40%) assigned to charger 0 at 0.15$/%
+t= 44  order 11 created  -> dest (3, 1), deadline t=65
+t= 44  order 10 delivered by vehicle 4 at (2, 3) -- ON TIME (deadline t=63)
+t= 44  order 11 dispatched -> vehicle 0 (dist 4, battery 100%, picked by rule)
+t= 45  vehicle 1 finished charging on charger 0 (battery 100%)
+t= 46  order  9 delivered by vehicle 3 at (5, 9) -- ON TIME (deadline t=65)
+t= 46  INCIDENT: charger 0 offline until t=49
+t= 48  order 12 created  -> dest (2, 9), deadline t=77
+t= 48  order 11 delivered by vehicle 0 at (3, 1) -- ON TIME (deadline t=65)
+t= 48  order 12 dispatched -> vehicle 1 (dist 11, battery 100%, picked by rule)
+t= 51  INCIDENT: charger 0 offline until t=59
+t= 52  order 13 created  -> dest (3, 1), deadline t=71
+t= 52  order 13 dispatched -> vehicle 0 (dist 4, battery 88%, picked by rule)
+t= 52  vehicle 2 (battery 32%) assigned to charger 1 at 0.15$/%
+t= 56  order 14 created  -> dest (1, 4), deadline t=74
+t= 56  order 13 delivered by vehicle 0 at (3, 1) -- ON TIME (deadline t=71)
+t= 56  vehicle 2 finished charging on charger 1 (battery 100%)
+t= 56  order 14 dispatched -> vehicle 2 (dist 5, battery 100%, picked by rule)
+t= 56  vehicle 3 (battery 24%) assigned to charger 1 at 0.15$/%
+t= 58  order 12 delivered by vehicle 1 at (2, 9) -- ON TIME (deadline t=77)
+t= 60  order 15 created  -> dest (5, 2), deadline t=84
+t= 60  vehicle 3 finished charging on charger 1 (battery 100%)
+t= 60  order 15 dispatched -> vehicle 0 (dist 7, battery 76%, picked by rule)
+t= 61  order 14 delivered by vehicle 2 at (1, 4) -- ON TIME (deadline t=74)
+t= 64  order 16 created  -> dest (7, 3), deadline t=84
+t= 64  order 16 dispatched -> vehicle 3 (dist 10, battery 100%, picked by rule)
+t= 66  order 15 delivered by vehicle 0 at (5, 2) -- ON TIME (deadline t=84)
+t= 68  order 17 created  -> dest (10, 3), deadline t=92
+t= 68  order 17 dispatched -> vehicle 1 (dist 13, battery 64%, picked by rule)
+t= 72  order 18 created  -> dest (9, 8), deadline t=101
+t= 72  order 16 delivered by vehicle 3 at (7, 3) -- ON TIME (deadline t=84)
+t= 72  order 18 dispatched -> vehicle 0 (dist 17, battery 56%, picked by rule)
+t= 76  order 19 created  -> dest (7, 10), deadline t=112
+t= 76  order 19 dispatched -> vehicle 2 (dist 17, battery 84%, picked by rule)
+t= 79  order 17 delivered by vehicle 1 at (10, 3) -- ON TIME (deadline t=92)
+t= 80  order 20 created  -> dest (1, 8), deadline t=102
+t= 80  order 20 dispatched -> vehicle 3 (dist 9, battery 72%, picked by rule)
+t= 82  order 18 delivered by vehicle 0 at (9, 8) -- ON TIME (deadline t=101)
+t= 84  order 21 created  -> dest (1, 6), deadline t=108
+t= 84  INCIDENT: charger 0 offline until t=89
+t= 84  order 21 dispatched -> vehicle 4 (dist 7, battery 48%, picked by rule)
+t= 87  order 19 delivered by vehicle 2 at (7, 10) -- ON TIME (deadline t=112)
+t= 88  order 22 created  -> dest (6, 8), deadline t=116
+t= 88  order 22 dispatched -> vehicle 5 (dist 14, battery 64%, picked by rule)
+t= 89  order 20 delivered by vehicle 3 at (1, 8) -- ON TIME (deadline t=102)
+t= 90  vehicle 1 (battery 24%) assigned to charger 0 at 0.15$/%
+t= 91  order 21 delivered by vehicle 4 at (1, 6) -- ON TIME (deadline t=108)
+t= 92  order 23 created  -> dest (3, 3), deadline t=113
+t= 92  vehicle 0 (battery 20%) assigned to charger 1 at 0.15$/%
+t= 94  vehicle 1 finished charging on charger 0 (battery 100%)
+t= 94  order 23 dispatched -> vehicle 1 (dist 6, battery 100%, picked by rule)
+t= 96  order 24 created  -> dest (3, 2), deadline t=112
+t= 96  vehicle 0 finished charging on charger 1 (battery 100%)
+t= 96  order 24 dispatched -> vehicle 0 (dist 5, battery 100%, picked by rule)
+t= 97  order 22 delivered by vehicle 5 at (6, 8) -- ON TIME (deadline t=116)
+t= 98  order 23 delivered by vehicle 1 at (3, 3) -- ON TIME (deadline t=113)
+t= 98  vehicle 4 (battery 24%) assigned to charger 0 at 0.15$/%
+t= 98  vehicle 3 (battery 40%) assigned to charger 1 at 0.15$/%
+t= 98  vehicle 2 (battery 44%) assigned to charger 2 at 0.15$/%
+t=100  order 25 created  -> dest (9, 2), deadline t=126
+t=100  order 24 delivered by vehicle 0 at (3, 2) -- ON TIME (deadline t=112)
+t=101  vehicle 3 finished charging on charger 1 (battery 100%)
+t=101  vehicle 2 finished charging on charger 2 (battery 100%)
+t=101  order 25 dispatched -> vehicle 2 (dist 11, battery 100%, picked by rule)
+t=102  vehicle 4 finished charging on charger 0 (battery 100%)
+t=104  order 26 created  -> dest (7, 3), deadline t=133
+t=104  order 26 dispatched -> vehicle 0 (dist 10, battery 88%, picked by rule)
+t=106  vehicle 5 (battery 32%) assigned to charger 0 at 0.15$/%
+t=108  order 27 created  -> dest (5, 8), deadline t=131
+t=108  INCIDENT: charger 1 offline until t=116
+t=108  order 27 dispatched -> vehicle 1 (dist 13, battery 88%, picked by rule)
+t=110  vehicle 5 finished charging on charger 0 (battery 100%)
+t=111  order 25 delivered by vehicle 2 at (9, 2) -- ON TIME (deadline t=126)
+t=112  order 28 created  -> dest (2, 10), deadline t=134
+t=112  order 26 delivered by vehicle 0 at (7, 3) -- ON TIME (deadline t=133)
+t=112  order 28 dispatched -> vehicle 3 (dist 12, battery 100%, picked by rule)
+t=113  INCIDENT: vehicle 3 broke down at (1, 1) (order 28 needs redispatch)
+t=113  order 28 dispatched -> vehicle 4 (dist 12, battery 100%, picked by rule)
+t=116  order 29 created  -> dest (4, 2), deadline t=135
+t=116  order 29 dispatched -> vehicle 5 (dist 6, battery 100%, picked by rule)
+t=117  order 27 delivered by vehicle 1 at (5, 8) -- ON TIME (deadline t=131)
+
+-- Grid snapshots (D=depot, digit=vehicle id, (n)=vehicle n charging) --
+t=30
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   4   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   0   .   .   .   .   .   .   .   5   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   1   .   .   .   .   .   .   .   .   .
+ D2   .   .   .   3   .   .   .   .   .   .
+v0: pos=(1, 5) batt= 50.0% status=enroute  v1: pos=(1, 1) batt= 62.0% status=enroute  v2: pos=(0, 0) batt= 68.0% status=idle  v3: pos=(4, 0) batt= 68.0% status=returning  v4: pos=(8, 7) batt= 76.0% status=returning  v5: pos=(9, 5) batt= 82.0% status=enroute
+
+t=60
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   1   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   2   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+ D5   .   .   .   .   .   .   .   .   .   .
+v0: pos=(0, 0) batt= 76.0% status=returning  v1: pos=(1, 8) batt= 80.0% status=returning  v2: pos=(1, 3) batt= 94.0% status=enroute  v3: pos=(0, 0) batt= 84.0% status=charging  v4: pos=(0, 0) batt= 48.0% status=idle  v5: pos=(0, 0) batt= 64.0% status=idle
+
+t=90
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   3   .   .   .   2   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   4   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   5   0   .   .   .   .   .   .   .   .
+ D1   .   .   .   .   .   .   .   .   .   .
+v0: pos=(2, 1) batt= 24.0% status=returning  v1: pos=(0, 0) batt= 24.0% status=returning  v2: pos=(5, 8) batt= 60.0% status=returning  v3: pos=(1, 8) batt= 56.0% status=returning  v4: pos=(1, 5) batt= 38.0% status=enroute  v5: pos=(1, 1) batt= 62.0% status=enroute
+
+t=120
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   4   1   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   .   .   .   .   .   .   .   .
+  .   .   .   5   .   .   .   .   .   .   .
+  .   3   .   .   .   .   .   .   .   .   .
+ D0   2   .   .   .   .   .   .   .   .   .
+v0: pos=(0, 0) batt= 60.0% status=returning  v1: pos=(3, 6) batt= 68.0% status=returning  v2: pos=(1, 0) batt= 66.0% status=returning  v3: pos=(1, 1) batt= 98.0% status=broken  v4: pos=(2, 6) batt= 88.0% status=enroute  v5: pos=(3, 2) batt= 94.0% status=enroute
+
+-- Final metrics --
+orders created:    30
+orders delivered:  28
+on-time %:         93.3
+total km driven:   405
+charging cost:     $107.60
