@@ -27,9 +27,14 @@ BREAKDOWN_VEHICLE = 1
 TICKS = 20
 
 
-def main():
+def run_scenario(record_frames=False):
+    """Runs the fixed scenario. With record_frames=True, also returns a
+    per-tick snapshot list (vehicle/charger/order state) for map_export.py
+    to animate — kept separate from the sim itself so this stays the one
+    place the scenario's tick loop is defined."""
     sim = Simulation(num_vehicles=3, seed=0)
     sim.chargers = sim.chargers[:2]
+    frames = [] if record_frames else None
 
     for t in range(TICKS):
         if t in FIXED_ORDERS:
@@ -45,6 +50,30 @@ def main():
         dispatch(sim)
         schedule_charging(sim)
         sim.tick += 1
+
+        if record_frames:
+            frames.append({
+                "tick": t,
+                "vehicles": [
+                    {"id": v.id, "pos": list(v.pos), "battery": v.battery, "status": v.status}
+                    for v in sim.vehicles
+                ],
+                "chargers": [{"id": c.id, "busy_with": c.busy_with} for c in sim.chargers],
+                "orders": [
+                    {
+                        "id": o.id, "dest": list(o.dest), "created_tick": o.created_tick,
+                        "deadline": o.deadline, "delivered_tick": o.delivered_tick,
+                        "assigned_to": o.assigned_to,
+                    }
+                    for o in sim.orders.values()
+                ],
+            })
+
+    return sim, frames
+
+
+def main():
+    sim, _ = run_scenario()
 
     print("-- Event log --")
     print("\n".join(sim.log))

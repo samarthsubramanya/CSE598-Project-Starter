@@ -1,2 +1,6 @@
 google-genai>=0.3.0
 python-dotenv>=1.0.0
+
+# map_screenshot.py only (map_export.py's HTML animation needs neither):
+requests>=2.31.0
+Pillow>=10.0.0

@@ -122,8 +122,95 @@ except for the label in the log.
   `trace.txt`. `run()` grades a seed on-time delivery %, km, and charging
   cost only, used for the 5-seed aggregate table in `results.txt`. Asserts
   a 50% on-time floor as a regression self-check.
-- `requirements.txt` — `google-genai`, `python-dotenv`.
+- `map_export.py` — replays `demo.py`'s fixed scenario as a self-contained,
+  animated HTML page on a real map (see below).
+- `map_screenshot.py` — renders one frame of that animation to a static
+  PNG, for docs/reports where a live HTML file isn't paste-able.
+- `requirements.txt` — `google-genai`, `python-dotenv` for the baseline;
+  `requests`, `Pillow` only for `map_screenshot.py`.
 - `.env` — `GEMINI_API_KEY` placeholder.
+
+## Map visualization
+
+`sim.py`'s grid is abstract — useful for the eval loop, meaningless to
+look at. `map_export.py` re-runs `demo.py`'s exact fixed scenario and
+replays it on a real map instead, using
+[Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/copyright)
+tiles: free, no API key or signup, unlike Mapbox/Google Maps. The grid's
+`(x, y)` coordinates are linearly mapped onto a small real bounding box
+around Tempe/ASU — grid `(0, 0)` (the depot) sits at that box's corner —
+purely as a recognizable backdrop; there's no real street routing, a
+vehicle still moves in straight grid steps, just plotted on real streets.
+
+```bash
+cd fleet_dispatch_baseline
+python3 map_export.py     # writes map_demo.html and tries to open it
+```
+
+Running `demo.py` alone never shows a map — it only prints text, and has
+no idea `map_export.py` exists. `map_export.py` is the one that writes
+`map_demo.html` and tries to auto-open it in a browser; if nothing opens
+(headless environment, no default browser configured), open the file
+manually — the script says so after a 3-second wait, it never hangs
+waiting for a display that isn't there.
+
+**If it seems to take a while:** with a real `GEMINI_API_KEY` configured,
+`map_export.py` re-runs the same scenario `demo.py` does, including its
+live Gemini calls — measured up to ~35s on a slow/unstable API response,
+not a hang. Remove the key (or use the `.env` placeholder) for an
+instant, rule-based-only run if you just want to see the map quickly.
+
+The whole 20-tick trace is embedded as JSON directly in the HTML file
+(no `fetch()`, no CORS issue, no local server), with play/pause and a
+tick scrubber. Vehicles are colored by status — idle (yellow), en route
+(blue), returning (green), charging (purple), broken down (red) — and
+pending-order destinations show as small orange dots until delivered.
+
+![map_demo.html running live in a browser at t=8: an idle vehicle (yellow), one en route (blue), one broken down (red) from the t=6 incident, one returning to depot (green), with the play/tick controls visible at the bottom](map_export.png)
+
+The screenshot above is `map_demo.html` itself, running live in a browser
+at `t=8` — play/pause button, tick counter, and scrubber all visible,
+exactly as `python3 map_export.py` produces it. `map_demo_screenshot.png`
+below is the other kind of output, from `map_screenshot.py`: a static PNG
+rendered directly from real OSM tiles (no browser involved), useful for
+pasting into a doc where a live HTML file isn't an option:
+
+![Static snapshot at t=12: one broken-down vehicle (red) from the t=6 incident, one en route (blue), one returning to depot (green), rendered on real OSM tiles of the ASU/Tempe area](map_demo_screenshot.png)
+
+That snapshot is `t=12` from the same run documented above: vehicle 1 is
+still red (broken, from the incident at t=6), vehicle 0 is blue (en route,
+carrying the redispatched order 2), and vehicle 2 is green (returning to
+depot after delivering order 5) — both screenshots reflect the exact same
+state machine as the text event log and the ASCII grid, just plotted
+somewhere recognizable. Regenerate the static snapshot for a different
+tick with `python3 map_screenshot.py <tick>`.
+
+**What this is and isn't:** a real map is genuinely useful for a human
+reviewing the baseline's behavior, but the underlying simulation hasn't
+changed — same grid, same Manhattan distance, no real street network or
+traffic. Wiring in an actual routing API (OSRM, GraphHopper — both have
+free tiers) so vehicles move along real streets instead of straight grid
+lines is a reasonable next step, not something this baseline claims to do.
+
+**Next scope — turning this into an agent-behavior visualization, not
+just a movement replay:**
+
+- **Decision view** — a side panel synced to the tick scrubber showing the
+  actual prompt sent to Gemini and its raw response for that dispatch
+  decision, plus which path fired (LLM succeeded / LLM failed and fell
+  back / rule-based). Right now the map shows *what* the agent decided;
+  this would show *why*, which is the actual thing worth grading in an
+  agentic system.
+- **Human-in-the-loop override** — let a reviewer click a vehicle mid-replay
+  and reassign it, with the override logged. Turns the map from a
+  read-only replay into the HITL interface Section 2 already claims is
+  in scope, instead of leaving HITL as a line in the doc with nothing to
+  point at.
+- **Critic overlay** — a separate LLM-as-judge pass annotates each
+  dispatch decision after the fact (e.g., "suboptimal — vehicle 3 was
+  closer and had more battery") and surfaces that annotation on the map.
+  Demonstrates the LLM-as-judge evaluation pattern directly, rather than
+  only reporting the on-time/km/cost numbers this baseline already has.
 
 ## Running it
 
@@ -141,24 +228,46 @@ picks used instead of the nearest-candidate rule.
 
 ## What a capstone team would build on top of this
 
-Skipped here, in scope for the real project:
+The baseline's proven weakness — a single greedy dispatcher has no
+lookahead, so one bad early assignment cascades into late deliveries later
+in the shift (see the 47%-93% seed-to-seed swing above) — is what the next
+phase is actually meant to fix, not just "add more agents" in the abstract:
 
-- **One agent per vehicle, negotiating** — instead of one central greedy
-  dispatcher, each vehicle bids for orders and charger slots based on its
-  own state.
-- **A genuine incident-replanning loop** — this baseline just unassigns an
+- **Contract-net-style auction, not just "agents"** — each vehicle runs its
+  own lightweight agent that bids on an incoming order (cost = distance +
+  battery risk + the opportunity cost of leaving its current post); a
+  dispatcher agent awards the order to the lowest bid. This is a genuine
+  multi-agent system, not a relabeled optimizer, and it directly targets
+  the lookahead gap the baseline doesn't have.
+- **Feasibility-checking tool as a veto, not a filter** — a constraint tool
+  that checks battery-vs-round-trip-distance rejects a bid outright before
+  it's accepted, replacing the flat battery threshold used here. The
+  agent proposes, the tool disposes — no bid reaches a vehicle without
+  passing it.
+- **A replan *loop*, not just a replan event** — this baseline unassigns an
   order on breakdown and lets the next tick's dispatch pick it up; a real
-  agent would actively reroute the rest of the fleet in response.
-- **Feasibility-checking tool** — a constraint tool that checks
-  battery-vs-round-trip-distance before a plan is accepted, rather than
-  the flat battery threshold used here.
-- **Smarter charging** — schedule ahead of time around the peak window
-  instead of reacting only when a vehicle drops below the threshold.
+  agent should re-run the auction for *every* in-flight assignment when an
+  incident hits, since one vehicle breaking down changes the best bid for
+  everyone else too, not just the orphaned order.
+- **An adversarial incident-generator agent** — rather than the fixed
+  random breakdown/outage probabilities here, an agent that learns which
+  incident timings and locations actually break the dispatcher gives a
+  much harder, more honest eval than random noise (a generator/discriminator
+  setup: one agent tries to break the dispatcher, the dispatcher tries not
+  to be broken).
+- **Smarter charging** — schedule ahead of time around the peak tariff
+  window instead of reacting only when a vehicle drops below the threshold.
 - **Road closures** — this baseline only models vehicle breakdown and
   charger failure, not the road-closure incident from the original
   problem statement.
 - **Real map/traffic data** — this baseline is a synthetic grid; a real
   project could swap in an actual street network.
+
+**The tradeoff to design around, not ignore:** negotiation rounds add
+latency and can fail to converge. Cap the rounds and fall back to this
+baseline's greedy rule when they don't — that fallback path already exists
+and is tested, so it's the natural safety net rather than a new mechanism
+to build.
 
 ## Background
 
