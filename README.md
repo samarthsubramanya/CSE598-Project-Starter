@@ -126,8 +126,12 @@ except for the label in the log.
   animated HTML page on a real map (see below).
 - `map_screenshot.py` — renders one frame of that animation to a static
   PNG, for docs/reports where a live HTML file isn't paste-able.
+- `notebook/demo.ipynb` — notebook version of `demo.py`, with the map rendered
+  inline (`IPython.display.HTML` + an `<iframe srcdoc=...>`) instead of
+  opened as a separate file. Runs the scenario once and reuses that same
+  run for both the text output and the map — see below.
 - `requirements.txt` — `google-genai`, `python-dotenv` for the baseline;
-  `requests`, `Pillow` only for `map_screenshot.py`.
+  `requests`, `Pillow` for `map_screenshot.py`; `jupyter` for `notebook/demo.ipynb`.
 - `.env` — `GEMINI_API_KEY` placeholder.
 
 ## Map visualization
@@ -184,6 +188,27 @@ depot after delivering order 5) — both screenshots reflect the exact same
 state machine as the text event log and the ASCII grid, just plotted
 somewhere recognizable. Regenerate the static snapshot for a different
 tick with `python3 map_screenshot.py <tick>`.
+
+### Notebook version
+
+```bash
+pip install -r requirements.txt
+jupyter notebook notebook/demo.ipynb
+```
+
+`notebook/demo.ipynb` runs the same fixed scenario as `demo.py` and renders the
+same map as `map_export.py`, but inline in the notebook instead of a
+separate `.html` file — no code duplicated, it imports `run_scenario()`
+from `demo.py` and `TEMPLATE`/`build_data()` from `map_export.py`
+directly. The scenario runs once; both the text event log and the map
+come from that single run, so this doesn't double up on Gemini API calls
+if a real key is configured. The map cell embeds the page via
+`IPython.display.HTML` wrapped in an `<iframe srcdoc=...>` (IPython
+will warn that `IFrame` is "more standard" — that class takes a `src`
+URL, not raw HTML content, so `srcdoc` is the correct choice here, not a
+shortcut around a warning). A final cell falls back to
+`map_screenshot.py`'s static PNG for notebook viewers that strip
+`<iframe>`/JS from rendered output (a static GitHub preview, nbviewer).
 
 **What this is and isn't:** a real map is genuinely useful for a human
 reviewing the baseline's behavior, but the underlying simulation hasn't

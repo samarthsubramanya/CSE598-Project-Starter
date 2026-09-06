@@ -1,0 +1,1 @@
+This notebook contains the same logic flow as for demo.py but in notebook format. In case the format is more preferable for scoring.
