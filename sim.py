@@ -2,8 +2,7 @@
 
 Discrete-tick simulation. Each tick: vehicles move one grid step toward
 their target, chargers add battery, then policy hooks (dispatch + charge
-scheduling, both pluggable) react to the new state. Kept dependency-free
-so evaluate.py can run it with or without an LLM in the loop.
+scheduling, both pluggable) react to the new state.
 """
 import random
 from dataclasses import dataclass, field

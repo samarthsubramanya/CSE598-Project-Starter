@@ -2,11 +2,7 @@
 that animates it on a real map — depot, vehicles, orders, incidents, ticks
 — using Leaflet + OpenStreetMap tiles.
 
-No API key, no signup, no server: OSM's tile server is free for this kind
-of light, non-commercial use (Leaflet's default attribution stays on the
-map, as required). The whole trace is embedded as JSON in the HTML file,
-so double-clicking map_demo.html and opening it in a browser is enough —
-no `python3 -m http.server` needed.
+
 
 The grid's abstract (x, y) coordinates are linearly mapped onto a small
 real bounding box around Tempe/ASU, purely for a recognizable, concrete

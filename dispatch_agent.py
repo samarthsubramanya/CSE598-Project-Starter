@@ -1,27 +1,5 @@
 """Order-to-vehicle dispatch: greedy nearest-idle-vehicle, with an optional
 Gemini call standing in for "the LLM picks among the top candidates".
-
-Same pattern as degree_plan_baseline/llm_agent.py: the LLM call returns
-None whenever a key isn't configured, the SDK is missing, or the response
-can't be parsed — falling back to the rule-based nearest-vehicle pick.
-
-Deliberately weak by design, not by accident — this is the baseline the
-real project needs to beat, not a preview of it:
-- The LLM sees every idle vehicle, not just the battery-feasible ones the
-  rule-based path restricts itself to (`_candidates` vs.
-  `_llm_candidate_pool`) — so it can send an underpowered van the rule-based
-  policy would have skipped.
-- The prompt withholds precomputed distance/battery numbers, so the model
-  has to estimate them from raw positions instead of being handed the
-  answer — a plain "closest vehicle" heuristic would just compute this.
-
-Calls are batched one-per-tick (all pending orders assigned in a single
-request), not one-per-order. In practice this barely reduces call count on
-its own — with more vehicles than the order-arrival rate, there's rarely
-more than one pending order per tick anyway. The change that actually
-matters once a quota is exhausted is the cooldown below: after a
-quota/rate-limit error, stop calling the API for a while instead of
-retrying (and failing) on every subsequent tick.
 """
 import json
 import os
@@ -73,16 +51,6 @@ def _quota_exhausted(exc_text):
 
 
 def _llm_batch_pick(orders, candidates):
-    """One call handles every pending order at once, instead of one call
-    per order. Returns ({order_id: vehicle}, failure_reason_or_None); a
-    reason is surfaced by dispatch() into the event log rather than
-    silently swallowed, so a rate limit doesn't just look identical to "no
-    key configured" when testing manually.
-
-    Once a call fails with a quota/rate-limit error, further calls are
-    skipped for _COOLDOWN_SECONDS — without this, a single exhausted quota
-    means every remaining tick still pays for a doomed API round-trip that
-    was always going to fail the same way."""
     global _cooldown_until
     key = _api_key()
     if not key or not orders or not candidates:
@@ -96,9 +64,6 @@ def _llm_batch_pick(orders, candidates):
     except ImportError:
         return {}, "google-genai package not installed"
 
-    # Deliberately withholds the distance/battery numbers the rule-based
-    # policy uses directly — the model has to estimate them from raw
-    # coordinates, which a plain nearest-vehicle heuristic never needs to do.
     order_lines = "\n".join(f"- order {o.id}: destination {o.dest}" for o in orders)
     vehicle_lines = "\n".join(f"- vehicle {v.id}: position {v.pos}" for v in candidates)
     prompt = f"""Assign vehicles to delivery orders.
@@ -112,10 +77,7 @@ Respond with ONLY a JSON object mapping order id to vehicle id, e.g.
 {{"0": 2, "1": 0}}. Only use vehicle ids listed above, each at most once.
 Not every order needs an assignment."""
     try:
-        # Without an explicit timeout/retry cap, a blocked or slow network
-        # path (e.g. a sandboxed dev environment with no outbound access)
-        # makes this call hang or retry for minutes instead of falling back
-        # — exactly the hang reported when GEMINI_API_KEY was first set.
+
         http_options = types.HttpOptions(
             timeout=10_000,  # ms — SDK's enforced floor; anything lower is rejected outright
             retry_options=types.HttpRetryOptions(attempts=1),
